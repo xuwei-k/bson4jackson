@@ -25,12 +25,6 @@ import org.codehaus.jackson.map.module.SimpleModule;
  * functionality.
  * @author Ed Anuff
  */
-public class BsonUuidModule extends SimpleModule {
-	/**
-	 * Default constructor
-	 */
-	public BsonUuidModule() {
-		super("BsonUuidModule", new Version(0, 1, 0, "alpha"));
-		addSerializer(UUID.class, new BsonUuidSerializer());
-	}
+class BsonUuidModule extends SimpleModule("BsonUuidModule", new Version(0, 1, 0, "alpha")) {
+  addSerializer(classOf[UUID], new BsonUuidSerializer());
 }

@@ -31,36 +31,41 @@ import de.undercouch.bson4jackson.BsonGenerator;
  * only be used in conjunction with the BsonGenerator.
  * @author Ed Anuff
  */
-public class BsonUuidSerializer extends JsonSerializer<UUID> {
-	@Override
-	public void serialize(UUID value, JsonGenerator jgen,
-			SerializerProvider provider) throws IOException,
-			JsonProcessingException {
-		if (!(jgen instanceof BsonGenerator)) {
-			throw new JsonGenerationException("BsonUuidSerializer can " +
-					"only be used with BsonGenerator");
-		}
-		((BsonGenerator)jgen).writeBinary(null, BsonConstants.SUBTYPE_UUID,
-				uuidToLittleEndianBytes(value), 0, 16);
-	}
+class BsonUuidSerializer extends JsonSerializer[UUID]{
 
-	/**
-	 * Utility routine for converting UUIDs to bytes in little endian format.
-	 * @param uuid The UUID to convert
-	 * @return a byte array representing the UUID in little endian format
-	 */
-	private static byte[] uuidToLittleEndianBytes(UUID uuid) {
-		long msb = uuid.getMostSignificantBits();
-		long lsb = uuid.getLeastSignificantBits();
-		byte[] buffer = new byte[16];
+  @throws(classOf[IOException])
+  @throws(classOf[JsonProcessingException])
+  override def serialize( value:UUID,jgen:JsonGenerator,provider:SerializerProvider){
+    if (!(jgen.isInstanceOf[BsonGenerator])) {
+      throw new JsonGenerationException("BsonUuidSerializer can " +
+          "only be used with BsonGenerator");
+    }
+    jgen.asInstanceOf[BsonGenerator].writeBinary(null, BsonConstants.SUBTYPE_UUID,
+        BsonUuidSerializer.uuidToLittleEndianBytes(value), 0, 16);
+  }
+}
 
-		for (int i = 0; i < 8; i++) {
-			buffer[i] = (byte) (msb >>> 8 * i);
-		}
-		for (int i = 8; i < 16; i++) {
-			buffer[i] = (byte) (lsb >>> 8 * (i - 16));
-		}
+object BsonUuidSerializer{
+  /**
+   * Utility routine for converting UUIDs to bytes in little endian format.
+   * @param uuid The UUID to convert
+   * @return a byte array representing the UUID in little endian format
+   */
+  private def uuidToLittleEndianBytes(uuid:UUID):Array[Byte] = {
+    val msb = uuid.getMostSignificantBits()
+    val lsb = uuid.getLeastSignificantBits()
+    val buffer = new Array[Byte](16)
 
-		return buffer;
-	}
+    var i = 0
+    while(i < 8) {
+      buffer(i) = (msb >>> 8 * i).asInstanceOf[Byte]
+      i += 1
+    }
+    while(i < 16) {
+      buffer(i) = (lsb >>> 8 * (i - 16)).asInstanceOf[Byte]
+      i += 1
+    }
+
+    buffer
+  }
 }
