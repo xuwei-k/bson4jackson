@@ -20,5 +20,5 @@ initialCommands in console := {
 }
 
 scalacOptions ++= Seq(
-  Opts.compile.deprecation
+  "-deprecation"
 )
