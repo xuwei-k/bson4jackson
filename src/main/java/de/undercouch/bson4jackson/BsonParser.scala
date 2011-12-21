@@ -61,10 +61,10 @@ object BsonParser {
      * reading from streams that may contain other content after the
      * document that will be read by something else.
      */
-    final val HONOR_DOCUMENT_LENGTH: = null
+    final val HONOR_DOCUMENT_LENGTH = new Feature("HONOR_DOCUMENT_LENGTH",0)
   }
 
-  final class Feature {
+  final class Feature private(name:String,ord:Int) extends java.lang.Enum[Feture](name,ord){
     /**
      * @return the bit mask that identifies this feature
      */
@@ -77,20 +77,16 @@ object BsonParser {
    * Specifies what the parser is currently parsing (field name or value) or
    * if it is done with the current element
    */
-  private final object State {
-    final val FIELDNAME: = null
-    final val VALUE: = null
-    final val DONE: = null
+  private object State extends Enumeration{
+    val FIELDNAME,VALUE,DONE = Value
   }
 
   /**
    * Information about the element currently begin parsed
+   *
+   * @param True if the document currently being parsed is an array
    */
-  private class Context {
-    def this(array: Boolean) {
-      this ()
-      this.array = array
-    }
+  private class Context(val array:Boolean = false) {
 
     def reset: Unit = {
       `type` = 0
@@ -100,21 +96,17 @@ object BsonParser {
     }
 
     /**
-     * True if the document currently being parsed is an array
-     */
-    private[bson4jackson] final val array: Boolean = false
-    /**
      * The bson type of the current element
      */
     private[bson4jackson] var `type`: Byte = 0
     /**
      * The field name of the current element
      */
-    private[bson4jackson] var fieldName: Nothing = null
+    private[bson4jackson] var fieldName: String = _
     /**
      * The value of the current element
      */
-    private[bson4jackson] var value: Nothing = null
+    private[bson4jackson] var value: AnyRef = _
     /**
      * The parsing state of the current token
      */
@@ -128,14 +120,12 @@ object BsonParser {
     private final val serialVersionUID: Long = -5441597278886285168L
   }
 
-  private class BsonLocation extends JsonLocation {
-    def this(srcRef: Nothing, totalBytes: Long) {
-      this ()
-      `super`(srcRef, totalBytes, -1, -1, -1)
-    }
+  private class BsonLocation(
+      srcRef: Nothing, totalBytes: Long
+    ) extends JsonLocation(srcRef, totalBytes, -1, -1, -1){
 
-    @Override override def toString: Nothing = {
-      var sb: Nothing = new Nothing(80)
+    override def toString: Nothing = {
+      val sb = new StringBuilder(80)
       sb.append("[Source: ")
       if (getSourceRef == null) {
         sb.append("UNKNOWN")
@@ -144,32 +134,36 @@ object BsonParser {
         sb.append(getSourceRef.toString)
       }
       sb.append("; pos: ")
-      sb.append(getByteOffset)
+      sb.append(getByteOffset())
       sb.append(']')
-      return sb.toString
+      sb.toString
     }
   }
 
 }
 
-class BsonParser extends JsonParserMinimalBase {
-  /**
-   * Constructs a new parser
-   * @param jsonFeatures bit flag composed of bits that indicate which
-   * { @link org.codehaus.jackson.JsonParser.Feature}s are enabled.
-   * @param bsonFeatures bit flag composed of bits that indicate which
-   * { @link Feature}s are enabled.
-   * @param in the input stream to parse.
-   */
-  def this(jsonFeatures: Int, bsonFeatures: Int, in: Nothing) {
-    this ()
-    `super`(jsonFeatures)
-    _bsonFeatures = bsonFeatures
-    _rawInputStream = in
+/**
+ * Constructs a new parser
+ * @param jsonFeatures bit flag composed of bits that indicate which
+ * { @link org.codehaus.jackson.JsonParser.Feature}s are enabled.
+ * @param bsonFeatures bit flag composed of bits that indicate which
+ * { @link Feature}s are enabled.
+ * @param in the input stream to parse.
+ */
+class BsonParser(
+    jsonFeatures:Int,_bsonFeatures:Int,_rawInputStream:InputStream
+  ) extends JsonParserMinimalBase(jsonFeatures) {
+
+  locally{
     if (!isEnabled(Feature.HONOR_DOCUMENT_LENGTH)) {
-      if (!(in.isInstanceOf[Nothing])) {
-        in = new StaticBufferedInputStream(in)
-      }
+      
+      val in = 
+        if (!(_rawInputStream.isInstanceOf[BufferedInputStream])) {
+          new StaticBufferedInputStream(_rawInputStream)
+        }else{
+          _rawInputStream
+        }
+
       _counter = new CountingInputStream(in)
       _in = new LittleEndianInputStream(_counter)
     }
@@ -184,22 +178,20 @@ class BsonParser extends JsonParserMinimalBase {
     return (_bsonFeatures & f.getMask) != 0
   }
 
-  @Override def getCodec: ObjectCodec = {
-    return _codec
-  }
+  override def getCodec: ObjectCodec = _codec
 
-  @Override def setCodec(c: ObjectCodec): Unit = {
+  override def setCodec(c: ObjectCodec): Unit = {
     _codec = c
   }
 
-  @Override def close: Unit = {
+  override def close: Unit = {
     if (isEnabled(JsonParser.Feature.AUTO_CLOSE_SOURCE)) {
       _in.close
     }
     _closed = true
   }
 
-  @Override def nextToken: JsonToken = {
+  override def nextToken: JsonToken = {
     var ctx: BsonParser.Context = _contexts.peek
     if (_currToken == null && ctx == null) {
       _currToken = handleNewDocument(false)
@@ -481,7 +473,7 @@ class BsonParser extends JsonParserMinimalBase {
    * @throws IOException if an I/O error occurs
    */
   protected def skipCString: Unit = {
-    while (_in.readByte != 0)
+    while (_in.readByte != 0){}
   }
 
   /**
@@ -565,11 +557,11 @@ class BsonParser extends JsonParserMinimalBase {
     return ctx
   }
 
-  @Override def isClosed: Boolean = {
+  override def isClosed: Boolean = {
     return _closed
   }
 
-  @Override def getCurrentName: Nothing = {
+  override def getCurrentName: Nothing = {
     var ctx: BsonParser.Context = _contexts.peek
     if (ctx == null) {
       return null
@@ -577,19 +569,19 @@ class BsonParser extends JsonParserMinimalBase {
     return ctx.fieldName
   }
 
-  @Override def getParsingContext: JsonStreamContext = {
+  override def getParsingContext: JsonStreamContext = {
     return null
   }
 
-  @Override def getTokenLocation: JsonLocation = {
+  override def getTokenLocation: JsonLocation = {
     return new BsonParser.BsonLocation(_in, _tokenPos)
   }
 
-  @Override def getCurrentLocation: JsonLocation = {
+  override def getCurrentLocation: JsonLocation = {
     return new BsonParser.BsonLocation(_in, _counter.getPosition)
   }
 
-  @Override def getText: Nothing = {
+  override def getText: Nothing = {
     var ctx: BsonParser.Context = _contexts.peek
     if (ctx == null || ctx.state eq State.FIELDNAME) {
       return null
@@ -600,27 +592,27 @@ class BsonParser extends JsonParserMinimalBase {
     return ctx.value.asInstanceOf[Nothing]
   }
 
-  @Override def getTextCharacters: Array[Char] = {
+  override def getTextCharacters: Array[Char] = {
     return getText.toCharArray
   }
 
-  @Override def getTextLength: Int = {
+  override def getTextLength: Int = {
     return getText.length
   }
 
-  @Override def getTextOffset: Int = {
+  override def getTextOffset: Int = {
     return 0
   }
 
-  @Override def hasTextCharacters: Boolean = {
+  override def hasTextCharacters: Boolean = {
     return false
   }
 
-  @Override def getNumberValue: Nothing = {
+  override def getNumberValue: Nothing = {
     return getContext.value.asInstanceOf[Nothing]
   }
 
-  @Override def getNumberType: JsonParser.NumberType = {
+  override def getNumberType: JsonParser.NumberType = {
     var ctx: BsonParser.Context = _contexts.peek
     if (ctx == null) {
       return null
@@ -646,15 +638,15 @@ class BsonParser extends JsonParserMinimalBase {
     return null
   }
 
-  @Override def getIntValue: Int = {
+  override def getIntValue: Int = {
     return (getContext.value.asInstanceOf[Nothing]).intValue
   }
 
-  @Override def getLongValue: Long = {
+  override def getLongValue: Long = {
     return (getContext.value.asInstanceOf[Nothing]).longValue
   }
 
-  @Override def getBigIntegerValue: Nothing = {
+  override def getBigIntegerValue: Nothing = {
     var n: Nothing = getNumberValue
     if (n == null) {
       return null
@@ -668,15 +660,15 @@ class BsonParser extends JsonParserMinimalBase {
     return new Nothing(n.toString)
   }
 
-  @Override def getFloatValue: Float = {
+  override def getFloatValue: Float = {
     return (getContext.value.asInstanceOf[Nothing]).floatValue
   }
 
-  @Override def getDoubleValue: Double = {
+  override def getDoubleValue: Double = {
     return (getContext.value.asInstanceOf[Nothing]).doubleValue
   }
 
-  @Override def getDecimalValue: Nothing = {
+  override def getDecimalValue: Nothing = {
     var n: Nothing = getNumberValue
     if (n == null) {
       return null
@@ -690,16 +682,16 @@ class BsonParser extends JsonParserMinimalBase {
     return new Nothing(n.toString)
   }
 
-  @Override def getBinaryValue(b64variant: Base64Variant): Array[Byte] = {
+  override def getBinaryValue(b64variant: Base64Variant): Array[Byte] = {
     return getText.getBytes
   }
 
-  @Override override def getEmbeddedObject: Nothing = {
+  override def getEmbeddedObject: Nothing = {
     var ctx: BsonParser.Context = _contexts.peek
     return (if (ctx != null) ctx.value else null)
   }
 
-  @Override protected def _handleEOF: Unit = {
+  override protected def _handleEOF: Unit = {
     _reportInvalidEOF
   }
 

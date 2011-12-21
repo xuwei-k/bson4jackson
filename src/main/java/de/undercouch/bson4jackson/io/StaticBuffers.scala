@@ -30,49 +30,37 @@ object StaticBuffers {
    * @return a thread-local singleton instance of this class
    */
   def getInstance: StaticBuffers = {
-    var ref: Nothing = _instance.get
-    var buf: StaticBuffers = (if (ref == null) null else ref.get)
+    val ref = _instance.get()
+    var buf = if (ref == null) null else ref.get()
     if (buf == null) {
       buf = new StaticBuffers
       _instance.set(new Nothing(buf))
     }
-    return buf
+    buf
   }
 
   /**
    * All buffers have a minimum size of 64 kb
    */
-  final val GLOBAL_MIN_SIZE: Int = 1024 * 64
+  final val GLOBAL_MIN_SIZE = 1024 * 64
   /**
    * A thread-local soft reference to the singleton instance of this class
    */
-  private final val _instance: Nothing = new Nothing
+  private final val _instance = new ThreadLocal[SoftReference[StaticBuffers]]()
 
   /**
    * Possible buffer keys
    */
-  final object Key {
-    final val BUFFER0: = null
-    final val BUFFER1: = null
-    final val BUFFER2: = null
-    final val BUFFER3: = null
-    final val BUFFER4: = null
-    final val BUFFER5: = null
-    final val BUFFER6: = null
-    final val BUFFER7: = null
-    final val BUFFER8: = null
-    final val BUFFER9: = null
+  object Key extends Enumeration{
+    val BUFFER0,BUFFER1,BUFFER2,BUFFER3,BUFFER4,BUFFER5,BUFFER6,BUFFER7,BUFFER8,BUFFER9 = Value
   }
 
 }
 
-class StaticBuffers {
-  /**
-   * Hidden constructor
-   */
-  private def this() {
-    this ()
-  }
+/**
+ * Hidden constructor
+ */
+class StaticBuffers private(){
 
   /**
    * Creates or re-uses a {@link CharBuffer} that has a minimum size. Calling
@@ -84,9 +72,9 @@ class StaticBuffers {
    * @param minSize the minimum size
    * @return the { @link CharBuffer} instance
    */
-  def charBuffer(key: StaticBuffers.Key, minSize: Int): Nothing = {
-    minSize = Math.max(minSize, GLOBAL_MIN_SIZE)
-    var r: Nothing = _charBuffers(key.ordinal)
+  def charBuffer(key: StaticBuffers.Key, minSize: Int):CharBuffer = {
+    minSize = math.max(minSize, GLOBAL_MIN_SIZE)
+    var r = _charBuffers(key.ordinal)
     if (r == null || r.capacity < minSize) {
       r = CharBuffer.allocate(minSize)
     }
@@ -94,7 +82,7 @@ class StaticBuffers {
       _charBuffers(key.ordinal) = null
       r.clear
     }
-    return r
+    r
   }
 
   /**
@@ -109,9 +97,9 @@ class StaticBuffers {
   /**
    * @see #charBuffer(Key, int)
    */
-  def byteBuffer(key: StaticBuffers.Key, minSize: Int): Nothing = {
+  def byteBuffer(key: StaticBuffers.Key, minSize: Int):ByteBuffer = {
     minSize = Math.max(minSize, GLOBAL_MIN_SIZE)
-    var r: Nothing = _byteBuffers(key.ordinal)
+    var r = _byteBuffers(key.ordinal)
     if (r == null || r.capacity < minSize) {
       r = ByteBuffer.allocate(minSize)
     }
@@ -119,7 +107,7 @@ class StaticBuffers {
       _byteBuffers(key.ordinal) = null
       r.clear
     }
-    return r
+    r
   }
 
   /**
@@ -132,6 +120,6 @@ class StaticBuffers {
   /**
    * Maps of already allocated re-usable buffers
    */
-  private var _byteBuffers: Array[Nothing] = new Array[Nothing](Key.values.length)
-  private var _charBuffers: Array[Nothing] = new Array[Nothing](Key.values.length)
+  private[this] var _byteBuffers = new Array[ByteBuffer](Key.values.length)
+  private[this] var _charBuffers = new Array[CharBuffer](Key.values.length)
 }

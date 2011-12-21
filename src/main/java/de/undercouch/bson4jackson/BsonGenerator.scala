@@ -52,10 +52,10 @@ object BsonGenerator {
      * or <code>org.bson.BSONDecoder</code> from the MongoDB Java Driver
      * do) then this feature will be very useful.</p>
      */
-    final val ENABLE_STREAMING: = null
+    final val ENABLE_STREAMING = new Feature("ENABLE_STREAMING",0)
   }
 
-  final class Feature {
+  final class Feature(name:String,ord:Int) extends java.lang.Enum[Feature](name,ord){
     /**
      * @return the bit mask that identifies this feature
      */
@@ -67,47 +67,32 @@ object BsonGenerator {
   /**
    * A structure describing the document currently being generated
    * @author Michel Kraemer
+   *
+   * Creates a new DocumentInfo object
+   * @param headerPos the position of the document's header
+   * in the output buffer
+   * @param array true if the document is an array
    */
-  private class DocumentInfo {
-    /**
-     * Creates a new DocumentInfo object
-     * @param headerPos the position of the document's header
-     * in the output buffer
-     * @param array true if the document is an array
-     */
+  private case class DocumentInfo(var headerPos:Int,var currentArrayPos:Int) {
     def this(headerPos: Int, array: Boolean) {
-      this ()
-      this.headerPos = headerPos
-      this.currentArrayPos = (if (array) 0 else -1)
+      this (headerPos,(if (array) 0 else -1))
     }
-
-    /**
-     * The position of the document's header in the output buffer
-     */
-    private[bson4jackson] final val headerPos: Int = 0
-    /**
-     * The current position in the array or -1 if the
-     * document is no array
-     */
-    private[bson4jackson] var currentArrayPos: Int = 0
   }
-
 }
 
-class BsonGenerator extends JsonGeneratorBase {
-  /**
-   * Creates a new generator
-   * @param jsonFeatures bit flag composed of bits that indicate which
-   * { @link org.codehaus.jackson.JsonGenerator.Feature}s are enabled.
-   * @param bsonFeatures bit flag composed of bits that indicate which
-   * { @link Feature}s are enabled.
-   * @param out the output stream to write to
-   */
-  def this(jsonFeatures: Int, bsonFeatures: Int, out: Nothing) {
-    this ()
-    `super`(jsonFeatures, null)
-    _bsonFeatures = bsonFeatures
-    _out = out
+/**
+ * Creates a new generator
+ * @param jsonFeatures bit flag composed of bits that indicate which
+ * { @link org.codehaus.jackson.JsonGenerator.Feature}s are enabled.
+ * @param bsonFeatures bit flag composed of bits that indicate which
+ * { @link Feature}s are enabled.
+ * @param out the output stream to write to
+ */
+class BsonGenerator(
+  jsonFeatures: Int,val _bsonFeatures: Int,val _out:OutputStream
+) extends JsonGeneratorBase(jsonFeatures,null) {
+
+  locally{
     if (isEnabled(Feature.ENABLE_STREAMING)) {
       _buffer.setReuseBuffersCount(2)
     }
@@ -119,14 +104,14 @@ class BsonGenerator extends JsonGeneratorBase {
    * @return true if the given feature is enabled
    */
   protected def isEnabled(f: BsonGenerator.Feature): Boolean = {
-    return (_bsonFeatures & f.getMask) != 0
+    (_bsonFeatures & f.getMask) != 0
   }
 
   /**
    * @return true if the generator is currently processing an array
    */
   protected def isArray: Boolean = {
-    return (if (_documents.isEmpty) false else _documents.peek.currentArrayPos >= 0)
+    (if (_documents.isEmpty) false else _documents.peek.currentArrayPos >= 0)
   }
 
   /**
@@ -137,14 +122,13 @@ class BsonGenerator extends JsonGeneratorBase {
    */
   protected def getAndIncCurrentArrayPos: Int = {
     if (_documents.isEmpty) {
-      return -1
+      -1
+    }else{
+      val di = _documents.peek
+      val r = di.currentArrayPos
+      di.currentArrayPos += 1
+      r
     }
-    var di: BsonGenerator.DocumentInfo = _documents.peek
-    var r: Int = di.currentArrayPos
-    ({
-      di.currentArrayPos += 1; di.currentArrayPos - 1
-    })
-    return r
   }
 
   /**
@@ -163,44 +147,44 @@ class BsonGenerator extends JsonGeneratorBase {
     _buffer.putInt(pos, _buffer.size - pos)
   }
 
-  @Override def flush: Unit = {
+  override def flush: Unit = {
     _out.flush
   }
 
-  @Override protected def _releaseBuffers: Unit = {
+  override protected def _releaseBuffers: Unit = {
     _buffer.clear
   }
 
-  @Override override def close: Unit = {
+  override def close: Unit = {
     if (isEnabled(JsonGenerator.Feature.AUTO_CLOSE_JSON_CONTENT)) {
       while (!_documents.isEmpty) {
-        writeEndObject
+        writeEndObject()
       }
     }
     _buffer.writeTo(_out)
-    _buffer.clear
-    _out.flush
+    _buffer.clear()
+    _out.flush()
     if (isEnabled(JsonGenerator.Feature.AUTO_CLOSE_TARGET)) {
       _out.close
     }
     super.close
   }
 
-  @Override override def writeStartArray: Unit = {
+  override def writeStartArray: Unit = {
     _verifyValueWrite("start an array")
     _writeContext = _writeContext.createChildArrayContext
     _writeStartObject(true)
   }
 
-  @Override override def writeEndArray: Unit = {
+  override def writeEndArray: Unit = {
     if (!_writeContext.inArray) {
       _reportError("Current context not an ARRAY but " + _writeContext.getTypeDesc)
     }
-    writeEndObjectInternal
+    writeEndObjectInternal()
     _writeContext = _writeContext.getParent
   }
 
-  @Override override def writeStartObject: Unit = {
+  override def writeStartObject: Unit = {
     _verifyValueWrite("start an object")
     _writeContext = _writeContext.createChildObjectContext
     _writeStartObject(false)
@@ -220,7 +204,7 @@ class BsonGenerator extends JsonGeneratorBase {
     reserveHeader
   }
 
-  @Override override def writeEndObject: Unit = {
+  override def writeEndObject: Unit = {
     if (!_writeContext.inObject) {
       _reportError("Current context not an object but " + _writeContext.getTypeDesc)
     }
@@ -231,7 +215,7 @@ class BsonGenerator extends JsonGeneratorBase {
   private def writeEndObjectInternal: Unit = {
     if (!_documents.isEmpty) {
       _buffer.putByte(BsonConstants.TYPE_END)
-      var info: BsonGenerator.DocumentInfo = _documents.pop
+      val info = _documents.pop
       if (!isEnabled(Feature.ENABLE_STREAMING)) {
         putHeader(info.headerPos)
       }
@@ -246,12 +230,12 @@ class BsonGenerator extends JsonGeneratorBase {
    */
   protected def _writeArrayFieldNameIfNeeded: Unit = {
     if (isArray) {
-      var p: Int = getAndIncCurrentArrayPos
+      val p = getAndIncCurrentArrayPos
       _writeFieldName(String.valueOf(p))
     }
   }
 
-  @Override def writeFieldName(name: Nothing): Unit = {
+  override def writeFieldName(name: Nothing): Unit = {
     var status: Int = _writeContext.writeFieldName(name)
     if (status == JsonWriteContext.STATUS_EXPECT_VALUE) {
       _reportError("Can not write a field name, expecting a value")
@@ -266,8 +250,8 @@ class BsonGenerator extends JsonGeneratorBase {
     _buffer.putByte(BsonConstants.END_OF_STRING)
   }
 
-  @Override protected def _verifyValueWrite(typeMsg: Nothing): Unit = {
-    var status: Int = _writeContext.writeValue
+  override protected def _verifyValueWrite(typeMsg: String): Unit = {
+    val status = _writeContext.writeValue
     if (status == JsonWriteContext.STATUS_EXPECT_NAME) {
       _reportError("Can not " + typeMsg + ", expecting field name")
     }
@@ -284,7 +268,7 @@ class BsonGenerator extends JsonGeneratorBase {
     }
   }
 
-  @Override def writeString(text: Nothing): Unit = {
+  override def writeString(text: Nothing): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_STRING)
@@ -296,11 +280,11 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeString(text: Array[Char], offset: Int, len: Int): Unit = {
+  override def writeString(text: Array[Char], offset: Int, len: Int): Unit = {
     writeString(new Nothing(text, offset, len))
   }
 
-  @Override def writeRaw(text: Nothing): Unit = {
+  override def writeRaw(text: Nothing): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write raw string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BINARY)
@@ -310,11 +294,11 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeRaw(text: Nothing, offset: Int, len: Int): Unit = {
+  override def writeRaw(text: Nothing, offset: Int, len: Int): Unit = {
     writeRaw(text.substring(offset, len))
   }
 
-  @Override def writeRaw(text: Array[Char], offset: Int, len: Int): Unit = {
+  override def writeRaw(text: Array[Char], offset: Int, len: Int): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write raw string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BINARY)
@@ -324,11 +308,11 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeRaw(c: Char): Unit = {
+  override def writeRaw(c: Char): Unit = {
     writeRaw(Array[Char](c), 0, 1)
   }
 
-  @Override def writeBinary(b64variant: Base64Variant, data: Array[Byte], offset: Int, len: Int): Unit = {
+  override def writeBinary(b64variant: Base64Variant, data: Array[Byte], offset: Int, len: Int): Unit = {
     writeBinary(b64variant, BsonConstants.SUBTYPE_BINARY, data, offset, len)
   }
 
@@ -349,20 +333,18 @@ class BsonGenerator extends JsonGeneratorBase {
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BINARY)
     _buffer.putInt(len)
     _buffer.putByte(subType)
-    var end: Int = offset + len
+    var end = offset + len
     if (end > data.length) {
       end = data.length
     }
     while (offset < end) {
       _buffer.putByte(data(offset))
-      ({
-        offset += 1; offset - 1
-      })
+      offset += 1
     }
-    flushBuffer
+    flushBuffer()
   }
 
-  @Override def writeNumber(v: Int): Unit = {
+  override def writeNumber(v: Int): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write number")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_INT32)
@@ -370,7 +352,7 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeNumber(v: Long): Unit = {
+  override def writeNumber(v: Long): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write number")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_INT64)
@@ -378,8 +360,8 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeNumber(v: Nothing): Unit = {
-    var bl: Int = v.bitLength
+  override def writeNumber(v: Nothing): Unit = {
+    val bl = v.bitLength
     if (bl < 32) {
       writeNumber(v.intValue)
     }
@@ -391,7 +373,7 @@ class BsonGenerator extends JsonGeneratorBase {
     }
   }
 
-  @Override def writeNumber(d: Double): Unit = {
+  override def writeNumber(d: Double): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write number")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_DOUBLE)
@@ -399,18 +381,18 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeNumber(f: Float): Unit = {
+  override def writeNumber(f: Float): Unit = {
     writeNumber(f.asInstanceOf[Double])
   }
 
-  @Override def writeNumber(dec: Nothing): Unit = {
-    var f: Float = dec.floatValue
-    if (!Float.isInfinite(f)) {
+  override def writeNumber(dec: BigDecimal): Unit = {
+    val f = dec.floatValue
+    if (!java.lang.Float.isInfinite(f)) {
       writeNumber(f)
     }
     else {
-      var d: Double = dec.doubleValue
-      if (!Double.isInfinite(d)) {
+      var d = dec.doubleValue
+      if (!java.lang.Double.isInfinite(d)) {
         writeNumber(d)
       }
       else {
@@ -419,11 +401,11 @@ class BsonGenerator extends JsonGeneratorBase {
     }
   }
 
-  @Override def writeNumber(encodedValue: Nothing): Unit = {
+  override def writeNumber(encodedValue: String): Unit = {
     writeString(encodedValue)
   }
 
-  @Override def writeBoolean(state: Boolean): Unit = {
+  override def writeBoolean(state: Boolean): Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write boolean")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BOOLEAN)
@@ -431,54 +413,41 @@ class BsonGenerator extends JsonGeneratorBase {
     flushBuffer
   }
 
-  @Override def writeNull: Unit = {
+  override def writeNull: Unit = {
     _writeArrayFieldNameIfNeeded
     _verifyValueWrite("write null")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_NULL)
     flushBuffer
   }
 
-  @Override def writeRawUTF8String(text: Array[Byte], offset: Int, length: Int): Unit = {
-    _writeArrayFieldNameIfNeeded
+  override def writeRawUTF8String(text: Array[Byte], offset: Int, length: Int): Unit = {
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write raw utf8 string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_STRING)
-    var p: Int = _buffer.size
+    val p = _buffer.size
     _buffer.putInt(0)
     {
-      var i: Int = offset
+      var i = offset
       while (i < length) {
-        {
-          _buffer.putByte(text(i))
-        }
-        ({
-          i += 1; i - 1
-        })
+        _buffer.putByte(text(i))
+        i += 1
       }
     }
     _buffer.putByte(BsonConstants.END_OF_STRING)
     _buffer.putInt(p, length)
-    flushBuffer
+    flushBuffer()
   }
 
-  @Override def writeUTF8String(text: Array[Byte], offset: Int, length: Int): Unit = {
+  override def writeUTF8String(text: Array[Byte], offset: Int, length: Int): Unit = {
     writeRawUTF8String(text, offset, length)
   }
 
-  /**
-   * Bit flag composed of bits that indicate which
-   * {@link Feature}s are enabled.
-   */
-  protected final val _bsonFeatures: Int = 0
-  /**
-   * The output stream to write to
-   */
-  protected final val _out: Nothing = null
   /**
    * Since a BSON document's header must include the size of the whole document
    * in bytes, we have to buffer the whole document first, before we can
    * write it to the output stream. BSON specifies LITTLE_ENDIAN for all tokens.
    */
-  protected final val _buffer: DynamicOutputBuffer = new DynamicOutputBuffer(ByteOrder.LITTLE_ENDIAN)
+  protected final val _buffer = new DynamicOutputBuffer(ByteOrder.LITTLE_ENDIAN)
   /**
    * Saves the position of the type marker for the object currently begin written
    */
@@ -486,5 +455,5 @@ class BsonGenerator extends JsonGeneratorBase {
   /**
    * Saves information about documents (the main document and embedded ones)
    */
-  protected var _documents: Nothing = new Nothing
+  protected var _documents = new ArrayDeque[DocumentInfo]()
 }
