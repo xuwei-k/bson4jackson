@@ -19,3 +19,6 @@ initialCommands in console := {
   "import de.undercouch.bson4jackson._"
 }
 
+scalacOptions ++= Seq(
+  Opts.compile.deprecation
+)
