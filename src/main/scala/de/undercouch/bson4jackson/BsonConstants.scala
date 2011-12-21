@@ -13,7 +13,7 @@
 // limitations under the License.
 
 package de.undercouch.bson4jackson
-
+/*
 /**
  * Constants used within the BSON format
  * @author Michel Kraemer
@@ -63,3 +63,4 @@ object BsonConstants {
   @inline final val SUBTYPE_MD5:Byte = 0x05
   @inline final val SUBTYPE_USER_DEFINED:Byte = 0x80.asInstanceOf[Byte]
 }
+*/
