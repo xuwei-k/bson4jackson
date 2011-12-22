@@ -94,13 +94,6 @@ class DynamicOutputBuffer(private var _order:ByteOrder,private val _bufferSize:I
 
   import DynamicOutputBuffer._
 
-  locally{
-    if (_bufferSize <= 0) {
-      throw new IllegalArgumentException("Initial buffer size must be larger than 0")
-    }
-    clear()
-  }
-
   /**
    * Creates a dynamic buffer with the given byte order and
    * a default initial buffer size of {@link #DEFAULT_BUFFER_SIZE} bytes.
@@ -632,4 +625,12 @@ class DynamicOutputBuffer(private var _order:ByteOrder,private val _bufferSize:I
    * @see #_buffersToReuse
    */
   private var _reuseBuffersCount: Int = 0
+
+  locally{
+    if (_bufferSize <= 0) {
+      throw new IllegalArgumentException("Initial buffer size must be larger than 0")
+    }
+    clear()
+  }
+
 }
