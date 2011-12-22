@@ -22,3 +22,12 @@ initialCommands in console := {
 scalacOptions ++= Seq(
   "-deprecation"
 )
+
+resolvers ++= Seq(
+  "xuwei-k" at "http://xuwei-k.github.com/mvn/"
+)
+
+addCompilerPlugin("org.scala-tools.sxr" %% "sxr" % "0.2.8-SNAPSHOT")
+
+scalacOptions <+= scalaSource in Compile map {"-P:sxr:base-directory:" + _.getAbsolutePath }
+
