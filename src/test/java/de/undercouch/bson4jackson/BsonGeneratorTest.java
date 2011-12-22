@@ -99,7 +99,7 @@ public class BsonGeneratorTest {
   public void stream() throws Exception {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     BsonFactory fac = new BsonFactory();
-    fac.enable(BsonGenerator.Feature.ENABLE_STREAMING());
+    fac.enable(BsonGenerator$Feature$.MODULE$.ENABLE_STREAMING());
     BsonGenerator gen = fac.createJsonGenerator(baos);
     byte[] dummy = new byte[DynamicOutputBuffer.DEFAULT_BUFFER_SIZE() * 3 / 2];
     gen.writeStartObject();

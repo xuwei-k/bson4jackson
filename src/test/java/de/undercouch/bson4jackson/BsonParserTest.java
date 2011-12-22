@@ -300,7 +300,7 @@ public class BsonParserTest {
   public void honorLength() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     BsonFactory bsonFactory = new BsonFactory();
-    bsonFactory.enable(BsonParser.Feature.HONOR_DOCUMENT_LENGTH());
+    bsonFactory.enable(BsonParser$Feature$.MODULE$.HONOR_DOCUMENT_LENGTH());
     BsonGenerator generator = bsonFactory.createJsonGenerator(out);
     generator.writeStartObject();
     generator.writeStringField("myField", "myValue");
