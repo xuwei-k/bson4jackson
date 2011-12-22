@@ -28,6 +28,9 @@ import java.util.ArrayList
 import java.util.LinkedList
 import java.util.{List => JList}
 import java.util.Queue
+import java.lang.{
+  Long => JLong,Byte => JByte,Short => JShort,Float => JFloat,Boolean => JBoolean,Double => JDouble
+}
 
 /**
  * <p>A random-access buffer that resizes itself. This buffer differentiates
@@ -87,10 +90,12 @@ object DynamicOutputBuffer {
  * @param order the byte order
  * @param initialSize the initial buffer size
  */
-class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:Int){
+class DynamicOutputBuffer(private var _order:ByteOrder,private val _bufferSize:Int){
+
+  import DynamicOutputBuffer._
 
   locally{
-    if (initialSize <= 0) {
+    if (_bufferSize <= 0) {
       throw new IllegalArgumentException("Initial buffer size must be larger than 0")
     }
     clear()
@@ -101,8 +106,8 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * a default initial buffer size of {@link #DEFAULT_BUFFER_SIZE} bytes.
    * @param order the byte order
    */
-  def this(order: Nothing) {
-    this(order, DEFAULT_BUFFER_SIZE)
+  def this(order: ByteOrder) {
+    this(order, DynamicOutputBuffer.DEFAULT_BUFFER_SIZE)
   }
 
   /**
@@ -111,7 +116,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param initialSize the initial buffer size
    */
   def this(initialSize: Int) {
-    this(DEFAULT_BYTE_ORDER, initialSize)
+    this(DynamicOutputBuffer.DEFAULT_BYTE_ORDER, initialSize)
   }
 
   /**
@@ -119,7 +124,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * a default initial buffer size of {@link #DEFAULT_BUFFER_SIZE} bytes.
    */
   def this() {
-    this(DEFAULT_BYTE_ORDER)
+    this(DynamicOutputBuffer.DEFAULT_BYTE_ORDER)
   }
 
   /**
@@ -170,7 +175,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
     val bb = _buffers.set(n, null)
     if (bb != null && _reuseBuffersCount > 0) {
       if (_buffersToReuse == null) {
-        _buffersToReuse = new LinkedList[byteBuffer]() 
+        _buffersToReuse = new LinkedList[ByteBuffer]()
       }
       if (_reuseBuffersCount > _buffersToReuse.size) {
         _buffersToReuse.add(bb)
@@ -195,12 +200,12 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param position the position
    * @return the buffer at the requested position
    */
-  private def getBuffer(position: Int): Nothing = {
-    val n: Int = position / _bufferSize
+  private def getBuffer(position: Int): ByteBuffer = {
+    val n = position / _bufferSize
     while (n >= _buffers.size) {
       addNewBuffer
     }
-    return _buffers.get(n)
+    _buffers.get(n)
   }
 
   /**
@@ -218,34 +223,22 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
   /**
    * @return the lazily created UTF-8 character set
    */
-  private def getUTF8Charset: Nothing = {
-    if (_utf8 == null) {
-      _utf8 = Charset.forName("UTF-8")
-    }
-    return _utf8
-  }
+  private lazy val getUTF8Charset: Charset = Charset.forName("UTF-8")
 
   /**
    * @return the lazily created UTF-8 encoder
    */
-  private def getUTF8Encoder: Nothing = {
-    if (_utf8Encoder == null) {
-      _utf8Encoder = getUTF8Charset.newEncoder
-    }
-    return _utf8Encoder
-  }
+  private lazy val getUTF8Encoder: CharsetEncoder = getUTF8Charset.newEncoder
 
   /**
    * @return the current buffer size (changes dynamically)
    */
-  def size: Int = {
-    return _size
-  }
+  def size: Int = _size
 
   /**
    * Clear the buffer and reset size and write position
    */
-  def clear: Unit = {
+  def clear(): Unit = {
     if (_buffersToReuse != null && !_buffersToReuse.isEmpty) {
       StaticBuffers.getInstance.releaseByteBuffer(BUFFER_KEY, _buffersToReuse.peek)
     }
@@ -268,9 +261,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    */
   def putByte(b: Byte): Unit = {
     putByte(_position, b)
-    ({
-      _position += 1; _position - 1
-    })
+    _position += 1
   }
 
   /**
@@ -279,7 +270,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param bs an array of bytes to put
    */
   def putBytes(bs: Byte*): Unit = {
-    putBytes(_position, bs)
+    putBytes(_position, bs:_*)
     _position += bs.length
   }
 
@@ -291,8 +282,8 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    */
   def putByte(pos: Int, b: Byte): Unit = {
     adaptSize(pos + 1)
-    val bb: Nothing = getBuffer(pos)
-    val i: Int = pos % _bufferSize
+    val bb = getBuffer(pos)
+    val i = pos % _bufferSize
     bb.put(i, b)
   }
 
@@ -302,22 +293,19 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param pos the position where to put the bytes
    * @param bs an array of bytes to put
    */
-  def putBytes(pos: Int, bs: Byte*): Unit = {
+  def putBytes(p: Int, bs: Byte*): Unit = {
+    var pos = p
     adaptSize(pos + bs.length)
-    val bb: Nothing = null
-    var i: Int = _bufferSize
+    var bb: ByteBuffer = null
+    var i = _bufferSize
     for (b <- bs) {
       if (i == _bufferSize) {
         bb = getBuffer(pos)
         i = pos % _bufferSize
       }
       bb.put(i, b)
-      ({
-        i += 1; i - 1
-      })
-      ({
-        pos += 1; pos - 1
-      })
+      i += 1;
+      pos += 1;
     }
   }
 
@@ -339,16 +327,16 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    */
   def putInt(pos: Int, i: Int): Unit = {
     adaptSize(pos + 4)
-    val bb: Nothing = getBuffer(pos)
-    val index: Int = pos % _bufferSize
+    val bb = getBuffer(pos)
+    val index = pos % _bufferSize
     if (bb.limit - index >= 4) {
       bb.putInt(index, i)
     }
     else {
-      val b0: Byte = i.asInstanceOf[Byte]
-      val b1: Byte = (i >> 8).asInstanceOf[Byte]
-      val b2: Byte = (i >> 16).asInstanceOf[Byte]
-      val b3: Byte = (i >> 24).asInstanceOf[Byte]
+      val b0 = i.asInstanceOf[Byte]
+      val b1 = (i >> 8).asInstanceOf[Byte]
+      val b2 = (i >> 16).asInstanceOf[Byte]
+      val b3 = (i >> 24).asInstanceOf[Byte]
       if (_order eq ByteOrder.BIG_ENDIAN) {
         putBytes(pos, b3, b2, b1, b0)
       }
@@ -376,7 +364,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    */
   def putLong(pos: Int, l: Long): Unit = {
     adaptSize(pos + 8)
-    val bb: Nothing = getBuffer(pos)
+    val bb = getBuffer(pos)
     val index: Int = pos % _bufferSize
     if (bb.limit - index >= 8) {
       bb.putLong(index, l)
@@ -416,7 +404,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param f the float to put
    */
   def putFloat(pos: Int, f: Float): Unit = {
-    putInt(pos, Float.floatToRawIntBits(f))
+    putInt(pos, JFloat.floatToRawIntBits(f))
   }
 
   /**
@@ -436,7 +424,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param d the double to put
    */
   def putDouble(pos: Int, d: Double): Unit = {
-    putLong(pos, Double.doubleToRawLongBits(d))
+    putLong(pos, JDouble.doubleToRawLongBits(d))
   }
 
   /**
@@ -444,7 +432,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * write position and increases the write position accordingly.
    * @param s the character sequence to put
    */
-  def putString(s: Nothing): Unit = {
+  def putString(s: CharSequence): Unit = {
     putString(_position, s)
     _position += (s.length * 2)
   }
@@ -455,26 +443,21 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param pos the position where to put the character sequence
    * @param s the character sequence to put
    */
-  def putString(pos: Int, s: Nothing): Unit = {
-    {
-      var i: Int = 0
-      while (i < s.length) {
-        {
-          val c: Char = s.charAt(i)
-          val b0: Byte = c.asInstanceOf[Byte]
-          val b1: Byte = (c >> 8).asInstanceOf[Byte]
-          if (_order eq ByteOrder.BIG_ENDIAN) {
-            putBytes(pos, b1, b0)
-          }
-          else {
-            putBytes(pos, b0, b1)
-          }
-          pos += 2
-        }
-        ({
-          i += 1; i - 1
-        })
+  def putString(p: Int, s: CharSequence): Unit = {
+    var pos = p
+    var i = 0
+    while (i < s.length) {
+      val c = s.charAt(i)
+      val b0 = c.asInstanceOf[Byte]
+      val b1 = (c >> 8).asInstanceOf[Byte]
+      if (_order eq ByteOrder.BIG_ENDIAN) {
+        putBytes(pos, b1, b0)
       }
+      else {
+        putBytes(pos, b0, b1)
+      }
+      pos += 2
+      i += 1
     }
   }
 
@@ -484,10 +467,10 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param s the string to put
    * @return the number of UTF-8 bytes put
    */
-  def putUTF8(s: Nothing): Int = {
-    val written: Int = putUTF8(_position, s)
+  def putUTF8(s: String): Int = {
+    val written = putUTF8(_position, s)
     _position += written
-    return written
+    written
   }
 
   /**
@@ -497,23 +480,21 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param s the string to put
    * @return the number of UTF-8 bytes put
    */
-  def putUTF8(pos: Int, s: Nothing): Int = {
-    var minibb: Nothing = null
-    val enc: Nothing = getUTF8Encoder
-    val in: Nothing = CharBuffer.wrap(s)
-    var pos2: Int = pos
-    var bb: Nothing = getBuffer(pos2)
-    var index: Int = pos2 % _bufferSize
+  def putUTF8(pos: Int, s: String): Int = {
+    var minibb: ByteBuffer = null
+    val enc = getUTF8Encoder
+    val in = CharBuffer.wrap(s)
+    var pos2 = pos
+    var bb = getBuffer(pos2)
+    var index = pos2 % _bufferSize
     bb.position(index)
     while (in.remaining > 0) {
-      var res: Nothing = enc.encode(in, bb, true)
+      var res = enc.encode(in, bb, true)
       if (bb eq minibb) {
         bb.flip
         while (bb.remaining > 0) {
           putByte(pos2, bb.get)
-          ({
-            pos2 += 1; pos2 - 1
-          })
+          pos2 += 1
         }
       }
       else {
@@ -539,14 +520,14 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
           res.throwException
         }
         catch {
-          case e: Nothing => {
-            throw new Nothing("Could not encode string", e)
+          case e: CharacterCodingException => {
+            throw new RuntimeException("Could not encode string", e)
           }
         }
       }
     }
     adaptSize(pos2)
-    return pos2 - pos
+    pos2 - pos
   }
 
   /**
@@ -556,9 +537,9 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param out the output stream to write to
    * @throws IOException if the buffer could not be flushed
    */
-  def flushTo(out: Nothing): Unit = {
-    val n1: Int = _flushPosition / _bufferSize
-    val n2: Int = _position / _bufferSize
+  def flushTo(out: OutputStream): Unit = {
+    val n1 = _flushPosition / _bufferSize
+    val n2 = _position / _bufferSize
     if (n1 < n2) {
       flushTo(Channels.newChannel(out))
     }
@@ -575,18 +556,16 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param out the channel to write to
    * @throws IOException if the buffer could not be flushed
    */
-  def flushTo(out: Nothing): Unit = {
-    var n1: Int = _flushPosition / _bufferSize
-    val n2: Int = _position / _bufferSize
+  def flushTo(out: WritableByteChannel): Unit = {
+    var n1 = _flushPosition / _bufferSize
+    val n2 = _position / _bufferSize
     while (n1 < n2) {
-      var bb: Nothing = _buffers.get(n1)
+      val bb = _buffers.get(n1)
       bb.rewind
       out.write(bb)
       deallocateBuffer(n1)
       _flushPosition += _bufferSize
-      ({
-        n1 += 1; n1 - 1
-      })
+      n1 += 1
     }
   }
 
@@ -597,7 +576,7 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param out the output stream to write to
    * @throws IOException if the buffer could not be written
    */
-  def writeTo(out: Nothing): Unit = {
+  def writeTo(out: OutputStream): Unit = {
     writeTo(Channels.newChannel(out))
   }
 
@@ -608,32 +587,22 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
    * @param out the channel to write to
    * @throws IOException if the buffer could not be written
    */
-  def writeTo(out: Nothing): Unit = {
-    var n1: Int = _flushPosition / _bufferSize
-    var n2: Int = _buffers.size
-    var toWrite: Int = _size - _flushPosition
+  def writeTo(out: WritableByteChannel): Unit = {
+    var n1 = _flushPosition / _bufferSize
+    var n2 = _buffers.size
+    var toWrite = _size - _flushPosition
     while (n1 < n2) {
-      var curWrite: Int = Math.min(toWrite, _bufferSize)
-      var bb: Nothing = _buffers.get(n1)
+      var curWrite = math.min(toWrite, _bufferSize)
+      var bb = _buffers.get(n1)
       bb.position(curWrite)
       bb.flip
       out.write(bb)
-      ({
-        n1 += 1; n1 - 1
-      })
+      n1 += 1
       toWrite -= curWrite
     }
   }
 
-  /**
-   * The byte order of this buffer
-   */
-  private final val _order: Nothing = null
-  /**
-   * The size of each internal buffer (also the initial buffer size)
-   */
-  private final val _bufferSize: Int = 0
-  /**
+ /**
    * The current write position
    */
   private var _position: Int = 0
@@ -651,23 +620,13 @@ class DynamicOutputBuffer(private var order:ByteOrder,private var initialSize:In
   /**
    * A linked list of internal buffers
    */
-  private var _buffers: Nothing = new Nothing(1)
-  /**
-   * The character set used in {@link #putUTF8(String)}. Will be
-   * created lazily in {@link #getUTF8Charset()}
-   */
-  private var _utf8: Nothing = null
-  /**
-   * The encoder used in {@link #putUTF8(String)}. Will be created
-   * lazily in {@link #getUTF8Encoder()}
-   */
-  private var _utf8Encoder: Nothing = null
+  private val _buffers:JList[ByteBuffer] = new ArrayList[ByteBuffer](1)
   /**
    * A queue of buffers that have already been flushed and are
    * free to reuse.
    * @see #_reuseBuffersCount
    */
-  private var _buffersToReuse: Nothing = null
+  private var _buffersToReuse: Queue[ByteBuffer] = null
   /**
    * The number of buffers to reuse
    * @see #_buffersToReuse

@@ -24,7 +24,7 @@ import java.util.ArrayDeque
 import java.util.Date
 import java.util.Deque
 import java.util.LinkedHashMap
-import java.util.Map
+import java.util.{Map => JMap}
 import java.util.UUID
 import java.util.regex.Pattern
 import org.codehaus.jackson.Base64Variant
@@ -45,6 +45,10 @@ import de.undercouch.bson4jackson.types.JavaScript
 import de.undercouch.bson4jackson.types.ObjectId
 import de.undercouch.bson4jackson.types.Symbol
 import de.undercouch.bson4jackson.types.Timestamp
+import java.lang.{
+  Integer => JInteger,Byte => JByte,Long => JLong,Short => JShort,Double => JDouble,Float => JFloat,Boolean => JBoolean
+}
+import scala.util.control.Breaks._
 
 /**
  * Reads a BSON document from the provided input stream
@@ -64,7 +68,7 @@ object BsonParser {
     final val HONOR_DOCUMENT_LENGTH = new Feature("HONOR_DOCUMENT_LENGTH",0)
   }
 
-  final class Feature private(name:String,ord:Int) extends java.lang.Enum[Feture](name,ord){
+  final class Feature private(name:String,ord:Int) extends java.lang.Enum[Feature](name,ord){
     /**
      * @return the bit mask that identifies this feature
      */
@@ -77,7 +81,7 @@ object BsonParser {
    * Specifies what the parser is currently parsing (field name or value) or
    * if it is done with the current element
    */
-  private object State extends Enumeration{
+  object State extends Enumeration{
     val FIELDNAME,VALUE,DONE = Value
   }
 
@@ -86,7 +90,7 @@ object BsonParser {
    *
    * @param True if the document currently being parsed is an array
    */
-  private class Context(val array:Boolean = false) {
+  class Context(val array:Boolean = false) {
 
     def reset: Unit = {
       `type` = 0
@@ -110,7 +114,7 @@ object BsonParser {
     /**
      * The parsing state of the current token
      */
-    private[bson4jackson] var state: BsonParser.State = State.FIELDNAME
+    private[bson4jackson] var state: BsonParser.State.Value = State.FIELDNAME
   }
 
   /**
@@ -121,10 +125,10 @@ object BsonParser {
   }
 
   private class BsonLocation(
-      srcRef: Nothing, totalBytes: Long
+      srcRef: AnyRef, totalBytes: Long
     ) extends JsonLocation(srcRef, totalBytes, -1, -1, -1){
 
-    override def toString: Nothing = {
+    override def toString: String = {
       val sb = new StringBuilder(80)
       sb.append("[Source: ")
       if (getSourceRef == null) {
@@ -151,13 +155,15 @@ object BsonParser {
  * @param in the input stream to parse.
  */
 class BsonParser(
-    jsonFeatures:Int,_bsonFeatures:Int,_rawInputStream:InputStream
+    jsonFeatures:Int,var _bsonFeatures:Int,var _rawInputStream:InputStream
   ) extends JsonParserMinimalBase(jsonFeatures) {
+
+  import BsonParser._
 
   locally{
     if (!isEnabled(Feature.HONOR_DOCUMENT_LENGTH)) {
-      
-      val in = 
+
+      val in =
         if (!(_rawInputStream.isInstanceOf[BufferedInputStream])) {
           new StaticBufferedInputStream(_rawInputStream)
         }else{
@@ -192,128 +198,113 @@ class BsonParser(
   }
 
   override def nextToken: JsonToken = {
-    var ctx: BsonParser.Context = _contexts.peek
-    if (_currToken == null && ctx == null) {
+    var ctx = _contexts.peek
+    if ((_currToken == null) && (ctx == null)) {
       _currToken = handleNewDocument(false)
     }
     else {
       _tokenPos = _counter.getPosition
       if (ctx == null) {
-        if (_currToken eq JsonToken.END_OBJECT) {
+        if (_currToken == JsonToken.END_OBJECT) {
           return null
+        }else{
+          throw new JsonParseException("Found element outside the document", getTokenLocation)
         }
-        throw new JsonParseException("Found element outside the document", getTokenLocation)
       }
-      if (ctx.state eq State.DONE) {
+      if (ctx.state == State.DONE) {
         ctx.reset
       }
-      var readValue: Boolean = true
-      if (ctx.state eq State.FIELDNAME) {
+      var readValue = true
+      if (ctx.state == State.FIELDNAME) {
         readValue = false
-        while (true) {
-          ctx.`type` = _in.readByte
-          if (ctx.`type` == BsonConstants.TYPE_END) {
-            _currToken = (if (ctx.array) JsonToken.END_ARRAY else JsonToken.END_OBJECT)
-            _contexts.pop
-          }
-          else if (ctx.`type` == BsonConstants.TYPE_UNDEFINED) {
-            skipCString
-            continue //todo: continue is not supported
-          }
-          else {
-            ctx.state = State.VALUE
-            _currToken = JsonToken.FIELD_NAME
-            if (ctx.array) {
-              readValue = true
+
+        breakable{
+          while (true) {
+            ctx.`type` = _in.readByte
+            if (ctx.`type` == BsonConstants.TYPE_END) {
+              _currToken = (if (ctx.array) JsonToken.END_ARRAY else JsonToken.END_OBJECT)
+              _contexts.pop
+
+              break
+            }else if (ctx.`type` != BsonConstants.TYPE_UNDEFINED) {
+              ctx.state = State.VALUE
+              _currToken = JsonToken.FIELD_NAME
+              if (ctx.array) {
+                readValue = true
+                skipCString
+                ctx.fieldName = null
+              }
+              else {
+                ctx.fieldName = readCString
+              }
+
+              break
+            }else{
               skipCString
-              ctx.fieldName = null
-            }
-            else {
-              ctx.fieldName = readCString
             }
           }
-          break //todo: break is not supported
         }
       }
       if (readValue) {
         ctx.`type` match {
           case BsonConstants.TYPE_DOUBLE =>
-            ctx.value = _in.readDouble
+            ctx.value = _in.readDouble.asInstanceOf[JDouble]
             _currToken = JsonToken.VALUE_NUMBER_FLOAT
-            break //todo: break is not supported
           case BsonConstants.TYPE_STRING =>
             ctx.value = readString
             _currToken = JsonToken.VALUE_STRING
-            break //todo: break is not supported
           case BsonConstants.TYPE_DOCUMENT =>
             _currToken = handleNewDocument(false)
-            break //todo: break is not supported
           case BsonConstants.TYPE_ARRAY =>
             _currToken = handleNewDocument(true)
-            break //todo: break is not supported
           case BsonConstants.TYPE_BINARY =>
             _currToken = handleBinary
-            break //todo: break is not supported
           case BsonConstants.TYPE_OBJECTID =>
             ctx.value = readObjectId
             _currToken = JsonToken.VALUE_EMBEDDED_OBJECT
-            break //todo: break is not supported
           case BsonConstants.TYPE_BOOLEAN =>
-            var b: Boolean = _in.readBoolean
-            ctx.value = b
+            var b = _in.readBoolean
+            ctx.value = b.asInstanceOf[JBoolean]
             _currToken = (if (b) JsonToken.VALUE_TRUE else JsonToken.VALUE_FALSE)
-            break //todo: break is not supported
           case BsonConstants.TYPE_DATETIME =>
-            ctx.value = new Nothing(_in.readLong)
+            ctx.value = new Date(_in.readLong)
             _currToken = JsonToken.VALUE_EMBEDDED_OBJECT
-            break //todo: break is not supported
           case BsonConstants.TYPE_NULL =>
             _currToken = JsonToken.VALUE_NULL
-            break //todo: break is not supported
           case BsonConstants.TYPE_REGEX =>
             _currToken = handleRegEx
-            break //todo: break is not supported
           case BsonConstants.TYPE_DBPOINTER =>
             _currToken = handleDBPointer
-            break //todo: break is not supported
           case BsonConstants.TYPE_JAVASCRIPT =>
             ctx.value = new JavaScript(readString)
             _currToken = JsonToken.VALUE_EMBEDDED_OBJECT
-            break //todo: break is not supported
           case BsonConstants.TYPE_SYMBOL =>
             ctx.value = readSymbol
             _currToken = JsonToken.VALUE_EMBEDDED_OBJECT
-            break //todo: break is not supported
           case BsonConstants.TYPE_JAVASCRIPT_WITH_SCOPE =>
             _currToken = handleJavascriptWithScope
-            break //todo: break is not supported
           case BsonConstants.TYPE_INT32 =>
-            ctx.value = _in.readInt
+            ctx.value = _in.readInt.asInstanceOf[JInteger]
             _currToken = JsonToken.VALUE_NUMBER_INT
-            break //todo: break is not supported
           case BsonConstants.TYPE_TIMESTAMP =>
             ctx.value = readTimestamp
             _currToken = JsonToken.VALUE_EMBEDDED_OBJECT
-            break //todo: break is not supported
           case BsonConstants.TYPE_INT64 =>
-            ctx.value = _in.readLong
+            ctx.value = _in.readLong.asInstanceOf[JLong]
             _currToken = JsonToken.VALUE_NUMBER_INT
-            break //todo: break is not supported
           case BsonConstants.TYPE_MINKEY =>
             ctx.value = "MinKey"
             _currToken = JsonToken.VALUE_STRING
-            break //todo: break is not supported
           case BsonConstants.TYPE_MAXKEY =>
             ctx.value = "MaxKey"
             _currToken = JsonToken.VALUE_STRING
-            break //todo: break is not supported
           case _ =>
             throw new JsonParseException("Unknown element type " + ctx.`type`, getTokenLocation)
         }
         ctx.state = State.DONE
       }
     }
-    return _currToken
+     _currToken
   }
 
   /**
@@ -325,18 +316,18 @@ class BsonParser(
    */
   protected def handleNewDocument(array: Boolean): JsonToken = {
     if (_in == null) {
-      var buf: Array[Byte] = new Array[Byte](Integer.SIZE / Byte.SIZE)
-      var len: Int = 0
+      var buf = new Array[Byte](JInteger.SIZE / JByte.SIZE)
+      var len = 0
       while (len < buf.length) {
-        var l: Int = _rawInputStream.read(buf, len, buf.length - len)
+        var l = _rawInputStream.read(buf, len, buf.length - len)
         if (l == -1) {
-          throw new Nothing("Not enough bytes for length of document")
+          throw new IOException("Not enough bytes for length of document")
         }
         len += l
       }
-      var documentLength: Int = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).getInt
-      var in: Nothing = new BoundedInputStream(_rawInputStream, documentLength - buf.length)
-      if (!(_rawInputStream.isInstanceOf[Nothing])) {
+      var documentLength = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).getInt
+      var in: InputStream = new BoundedInputStream(_rawInputStream, documentLength - buf.length)
+      if (!(_rawInputStream.isInstanceOf[BufferedInputStream])) {
         in = new StaticBufferedInputStream(in)
       }
       _counter = new CountingInputStream(in)
@@ -346,7 +337,7 @@ class BsonParser(
       _in.readInt
     }
     _contexts.push(new BsonParser.Context(array))
-    return (if (array) JsonToken.START_ARRAY else JsonToken.START_OBJECT)
+    (if (array) JsonToken.START_ARRAY else JsonToken.START_OBJECT)
   }
 
   /**
@@ -355,28 +346,25 @@ class BsonParser(
    * @throws IOException if an I/O error occurs
    */
   protected def handleBinary: JsonToken = {
-    var size: Int = _in.readInt
-    var subtype: Byte = _in.readByte
-    var ctx: BsonParser.Context = getContext
+    val size = _in.readInt
+    val subtype = _in.readByte
+    val ctx = getContext
     subtype match {
       case BsonConstants.SUBTYPE_BINARY_OLD =>
-        var size2: Int = _in.readInt
-        var buf2: Array[Byte] = new Array[Byte](size2)
+        val size2: Int = _in.readInt
+        val buf2: Array[Byte] = new Array[Byte](size2)
         _in.readFully(buf2)
         ctx.value = buf2
-        break //todo: break is not supported
       case BsonConstants.SUBTYPE_UUID =>
-        var l1: Long = _in.readLong
-        var l2: Long = _in.readLong
-        ctx.value = new Nothing(l1, l2)
-        break //todo: break is not supported
+        val l1 = _in.readLong
+        val l2 = _in.readLong
+        ctx.value = new UUID(l1, l2)
       case _ =>
         var buf: Array[Byte] = new Array[Byte](size)
         _in.readFully(buf)
         ctx.value = buf
-        break //todo: break is not supported
     }
-    return JsonToken.VALUE_EMBEDDED_OBJECT
+    JsonToken.VALUE_EMBEDDED_OBJECT
   }
 
   /**
@@ -386,39 +374,26 @@ class BsonParser(
    * @return the Java flags
    * @throws JsonParseException if the pattern string contains a unsupported flag
    */
-  protected def regexStrToFlags(pattern: Nothing): Int = {
-    var flags: Int = 0
-    {
-      var i: Int = 0
-      while (i < pattern.length) {
-        {
-          var c: Char = pattern.charAt(i)
-          c match {
-            case 'i' =>
-              flags |= Pattern.CASE_INSENSITIVE
-              break //todo: break is not supported
-            case 'm' =>
-              flags |= Pattern.MULTILINE
-              break //todo: break is not supported
-            case 's' =>
-              flags |= Pattern.DOTALL
-              break //todo: break is not supported
-            case 'u' =>
-              flags |= Pattern.UNICODE_CASE
-              break //todo: break is not supported
-            case 'l' =>
-            case 'x' =>
-              break //todo: break is not supported
-            case _ =>
-              throw new JsonParseException("Invalid regex", getTokenLocation)
-          }
-        }
-        ({
-          i += 1; i - 1
-        })
+  protected def regexStrToFlags(pattern: String): Int = {
+    var flags = 0
+    var i = 0
+    while (i < pattern.length) {
+      pattern.charAt(i) match {
+        case 'i' =>
+          flags |= Pattern.CASE_INSENSITIVE
+        case 'm' =>
+          flags |= Pattern.MULTILINE
+        case 's' =>
+          flags |= Pattern.DOTALL
+        case 'u' =>
+          flags |= Pattern.UNICODE_CASE
+        case 'l' | 'x' =>
+        case _ =>
+          throw new JsonParseException("Invalid regex", getTokenLocation)
       }
+      i += 1
     }
-    return flags
+    flags
   }
 
   /**
@@ -427,10 +402,10 @@ class BsonParser(
    * @throws IOException if an I/O error occurs
    */
   protected def handleRegEx: JsonToken = {
-    var regex: Nothing = readCString
-    var pattern: Nothing = readCString
+    val regex = readCString
+    val pattern = readCString
     getContext.value = Pattern.compile(regex, regexStrToFlags(pattern))
-    return JsonToken.VALUE_EMBEDDED_OBJECT
+    JsonToken.VALUE_EMBEDDED_OBJECT
   }
 
   /**
@@ -439,11 +414,11 @@ class BsonParser(
    * @throws IOException if an I/O error occurs
    */
   protected def handleDBPointer: JsonToken = {
-    var pointer: Nothing = new Nothing
+    val pointer = new LinkedHashMap[String,Any]()
     pointer.put("$ns", readString)
     pointer.put("$id", readObjectId)
     getContext.value = pointer
-    return JsonToken.VALUE_EMBEDDED_OBJECT
+    JsonToken.VALUE_EMBEDDED_OBJECT
   }
 
   /**
@@ -454,8 +429,8 @@ class BsonParser(
    */
   protected def handleJavascriptWithScope: JsonToken = {
     _in.readInt
-    var code: Nothing = readString
-    var doc: Nothing = readDocument
+    val code = readString
+    val doc = readDocument
     getContext.value = new JavaScript(code, doc)
     return JsonToken.VALUE_EMBEDDED_OBJECT
   }
@@ -464,9 +439,7 @@ class BsonParser(
    * @return a null-terminated string read from the input stream
    * @throws IOException if the string could not be read
    */
-  protected def readCString: Nothing = {
-    return _in.readUTF(-1)
-  }
+  protected def readCString: String = _in.readUTF(-1)
 
   /**
    * Skips over a null-terminated string in the input stream
@@ -482,20 +455,19 @@ class BsonParser(
    * @return the string
    * @throws IOException if the string could not be read
    */
-  protected def readString: Nothing = {
-    var bytes: Int = _in.readInt
+  protected def readString: String = {
+    val bytes = _in.readInt
     if (bytes <= 0) {
-      throw new Nothing("Invalid number of string bytes")
+      throw new IOException("Invalid number of string bytes")
     }
-    var s: Nothing = null
-    if (bytes > 1) {
-      s = _in.readUTF(bytes - 1)
-    }
-    else {
-      s = ""
-    }
+    val s =
+      if (bytes > 1)
+        _in.readUTF(bytes - 1)
+      else
+        ""
+
     _in.readByte
-    return s
+    s
   }
 
   /**
@@ -535,14 +507,13 @@ class BsonParser(
    * @return the parsed document
    * @throws IOException if the document could not be read
    */
-  protected def readDocument: Nothing = {
-    var codec: ObjectCodec = getCodec
+  protected def readDocument: JMap[String,Any] = {
+    var codec = getCodec
     if (codec == null) {
-      throw new Nothing("Could not parse embedded document " + "because BSON parser has no codec")
+      throw new IllegalStateException("Could not parse embedded document because BSON parser has no codec")
     }
     _currToken = handleNewDocument(false)
-    return codec.readValue(this, new TypeReference[Nothing] {
-    })
+    codec.readValue(this, new TypeReference[JMap[String,Any]] {})
   }
 
   /**
@@ -550,155 +521,129 @@ class BsonParser(
    * @throws IOException if there is no context
    */
   protected def getContext: BsonParser.Context = {
-    var ctx: BsonParser.Context = _contexts.peek
-    if (ctx == null) {
-      throw new Nothing("Context unknown")
+    Option(_contexts.peek).getOrElse{
+      throw new IOException("Context unknown")
     }
-    return ctx
   }
 
-  override def isClosed: Boolean = {
-    return _closed
+  override def isClosed: Boolean = _closed
+
+  override def getCurrentName: String = {
+    Option(_contexts.peek).map{_.fieldName}.orNull
   }
 
-  override def getCurrentName: Nothing = {
-    var ctx: BsonParser.Context = _contexts.peek
-    if (ctx == null) {
-      return null
-    }
-    return ctx.fieldName
-  }
+  override def getParsingContext: JsonStreamContext = null
 
-  override def getParsingContext: JsonStreamContext = {
-    return null
-  }
-
-  override def getTokenLocation: JsonLocation = {
-    return new BsonParser.BsonLocation(_in, _tokenPos)
-  }
+  override def getTokenLocation: JsonLocation = new BsonParser.BsonLocation(_in, _tokenPos)
 
   override def getCurrentLocation: JsonLocation = {
-    return new BsonParser.BsonLocation(_in, _counter.getPosition)
+    new BsonParser.BsonLocation(_in, _counter.getPosition)
   }
 
-  override def getText: Nothing = {
-    var ctx: BsonParser.Context = _contexts.peek
-    if (ctx == null || ctx.state eq State.FIELDNAME) {
+  override def getText: String = {
+    val ctx = _contexts.peek()
+    if (ctx == null || ctx.state == State.FIELDNAME) {
       return null
     }
-    if (ctx.state eq State.VALUE) {
+    if (ctx.state == State.VALUE) {
       return ctx.fieldName
     }
-    return ctx.value.asInstanceOf[Nothing]
+    return ctx.value.asInstanceOf[String]
   }
 
-  override def getTextCharacters: Array[Char] = {
-    return getText.toCharArray
-  }
+  override def getTextCharacters: Array[Char] = getText.toCharArray
 
-  override def getTextLength: Int = {
-    return getText.length
-  }
+  override def getTextLength: Int = getText.length
 
-  override def getTextOffset: Int = {
-    return 0
-  }
+  override val getTextOffset = 0
 
-  override def hasTextCharacters: Boolean = {
-    return false
-  }
+  override val hasTextCharacters = false
 
-  override def getNumberValue: Nothing = {
-    return getContext.value.asInstanceOf[Nothing]
-  }
+  override def getNumberValue: Number = getContext.value.asInstanceOf[Number]
 
   override def getNumberType: JsonParser.NumberType = {
-    var ctx: BsonParser.Context = _contexts.peek
+    import JsonParser.NumberType
+
+    val ctx = _contexts.peek()
     if (ctx == null) {
-      return null
+      null
+    }else
+    if (ctx.value.isInstanceOf[JInteger]) {
+      NumberType.INT
     }
-    if (ctx.value.isInstanceOf[Nothing]) {
-      return NumberType.INT
+    else if (ctx.value.isInstanceOf[JLong]) {
+      NumberType.LONG
     }
-    else if (ctx.value.isInstanceOf[Nothing]) {
-      return NumberType.LONG
+    else if (ctx.value.isInstanceOf[BigInteger]) {
+      NumberType.BIG_INTEGER
     }
-    else if (ctx.value.isInstanceOf[Nothing]) {
-      return NumberType.BIG_INTEGER
+    else if (ctx.value.isInstanceOf[JFloat]) {
+      NumberType.FLOAT
     }
-    else if (ctx.value.isInstanceOf[Nothing]) {
-      return NumberType.FLOAT
+    else if (ctx.value.isInstanceOf[JDouble]) {
+      NumberType.DOUBLE
     }
-    else if (ctx.value.isInstanceOf[Nothing]) {
-      return NumberType.DOUBLE
+    else if (ctx.value.isInstanceOf[BigDecimal]) {
+      NumberType.BIG_DECIMAL
+    }else{
+      null // TODO ?
     }
-    else if (ctx.value.isInstanceOf[Nothing]) {
-      return NumberType.BIG_DECIMAL
-    }
-    return null
   }
 
   override def getIntValue: Int = {
-    return (getContext.value.asInstanceOf[Nothing]).intValue
+    return (getContext.value.asInstanceOf[Number]).intValue
   }
 
   override def getLongValue: Long = {
-    return (getContext.value.asInstanceOf[Nothing]).longValue
+    return (getContext.value.asInstanceOf[Number]).longValue
   }
 
-  override def getBigIntegerValue: Nothing = {
-    var n: Nothing = getNumberValue
+  override def getBigIntegerValue: BigInteger = {
+    val n = getNumberValue
     if (n == null) {
-      return null
+      null
+    }else if (n.isInstanceOf[JByte] || n.isInstanceOf[JInteger] || n.isInstanceOf[JLong] || n.isInstanceOf[JShort]) {
+      BigInteger.valueOf(n.longValue)
+    }else if (n.isInstanceOf[JDouble] || n.isInstanceOf[JFloat]) {
+      BigDecimal.valueOf(n.doubleValue).toBigInteger
+    }else{
+      new BigInteger(n.toString)
     }
-    if (n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing]) {
-      return BigInteger.valueOf(n.longValue)
-    }
-    else if (n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing]) {
-      return BigDecimal.valueOf(n.doubleValue).toBigInteger
-    }
-    return new Nothing(n.toString)
   }
 
   override def getFloatValue: Float = {
-    return (getContext.value.asInstanceOf[Nothing]).floatValue
+    (getContext.value.asInstanceOf[Number]).floatValue
   }
 
   override def getDoubleValue: Double = {
-    return (getContext.value.asInstanceOf[Nothing]).doubleValue
+    (getContext.value.asInstanceOf[Number]).doubleValue
   }
 
-  override def getDecimalValue: Nothing = {
-    var n: Nothing = getNumberValue
+  override def getDecimalValue: BigDecimal = {
+    val n = getNumberValue()
     if (n == null) {
-      return null
+      null
+    }else if (n.isInstanceOf[JByte] || n.isInstanceOf[JInteger] || n.isInstanceOf[JLong] || n.isInstanceOf[JShort]) {
+      BigDecimal.valueOf(n.longValue)
     }
-    if (n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing]) {
-      return BigDecimal.valueOf(n.longValue)
+    else if (n.isInstanceOf[JDouble] || n.isInstanceOf[JFloat]) {
+      BigDecimal.valueOf(n.doubleValue)
+    }else{
+      new BigDecimal(n.toString)
     }
-    else if (n.isInstanceOf[Nothing] || n.isInstanceOf[Nothing]) {
-      return BigDecimal.valueOf(n.doubleValue)
-    }
-    return new Nothing(n.toString)
   }
 
-  override def getBinaryValue(b64variant: Base64Variant): Array[Byte] = {
-    return getText.getBytes
-  }
+  override def getBinaryValue(b64variant: Base64Variant): Array[Byte] = getText.getBytes
 
-  override def getEmbeddedObject: Nothing = {
-    var ctx: BsonParser.Context = _contexts.peek
-    return (if (ctx != null) ctx.value else null)
+  override def getEmbeddedObject: AnyRef = {
+    val ctx = _contexts.peek
+    (if (ctx != null) ctx.value else null)
   }
 
   override protected def _handleEOF: Unit = {
     _reportInvalidEOF
   }
 
-  /**
-   * The features for this parser
-   */
-  private var _bsonFeatures: Int = 0
   /**
    * The input stream to read from
    */
@@ -707,10 +652,6 @@ class BsonParser(
    * Counts the number of bytes read from {@link #_in}
    */
   private var _counter: CountingInputStream = null
-  /**
-   * The raw input stream passed in
-   */
-  private var _rawInputStream: Nothing = null
   /**
    * True if the parser has been closed
    */
@@ -727,5 +668,5 @@ class BsonParser(
    * A stack of {@link Context} objects describing the current
    * parser state.
    */
-  private var _contexts: Nothing = new Nothing
+  private val _contexts:Deque[Context] = new ArrayDeque[Context]()
 }

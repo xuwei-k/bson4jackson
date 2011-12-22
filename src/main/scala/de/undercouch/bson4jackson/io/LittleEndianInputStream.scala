@@ -312,7 +312,7 @@ class LittleEndianInputStream(i:InputStream) extends FilterInputStream(i) with D
             }
             utf8buf.flip();
           } else if (len > 0) {
-            val r = Math.min(len, utf8buf.remaining());
+            val r = math.min(len, utf8buf.remaining());
             input.readFully(rawUtf8Buf, utf8buf.position(), r);
             len -= r;
             utf8buf.limit(r);

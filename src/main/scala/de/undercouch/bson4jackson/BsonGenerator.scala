@@ -59,9 +59,7 @@ object BsonGenerator {
     /**
      * @return the bit mask that identifies this feature
      */
-    def getMask: Int = {
-      return (1 << ordinal)
-    }
+    def getMask: Int = 1 << ordinal
   }
 
   /**
@@ -73,7 +71,7 @@ object BsonGenerator {
    * in the output buffer
    * @param array true if the document is an array
    */
-  private case class DocumentInfo(var headerPos:Int,var currentArrayPos:Int) {
+  case class DocumentInfo(var headerPos:Int,var currentArrayPos:Int) {
     def this(headerPos: Int, array: Boolean) {
       this (headerPos,(if (array) 0 else -1))
     }
@@ -91,6 +89,8 @@ object BsonGenerator {
 class BsonGenerator(
   jsonFeatures: Int,val _bsonFeatures: Int,val _out:OutputStream
 ) extends JsonGeneratorBase(jsonFeatures,null) {
+
+  import BsonGenerator._
 
   locally{
     if (isEnabled(Feature.ENABLE_STREAMING)) {
@@ -196,7 +196,7 @@ class BsonGenerator(
    * @throws IOException if the document could not be created
    */
   protected def _writeStartObject(array: Boolean): Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     if (!_documents.isEmpty) {
       _buffer.putByte(_typeMarker, (if (array) BsonConstants.TYPE_ARRAY else BsonConstants.TYPE_DOCUMENT))
     }
@@ -204,15 +204,15 @@ class BsonGenerator(
     reserveHeader
   }
 
-  override def writeEndObject: Unit = {
+  override def writeEndObject(): Unit = {
     if (!_writeContext.inObject) {
       _reportError("Current context not an object but " + _writeContext.getTypeDesc)
     }
     _writeContext = _writeContext.getParent
-    writeEndObjectInternal
+    writeEndObjectInternal()
   }
 
-  private def writeEndObjectInternal: Unit = {
+  private def writeEndObjectInternal(): Unit = {
     if (!_documents.isEmpty) {
       _buffer.putByte(BsonConstants.TYPE_END)
       val info = _documents.pop
@@ -228,22 +228,22 @@ class BsonGenerator(
    * element in the array)
    * @throws IOException if the field name could not be written
    */
-  protected def _writeArrayFieldNameIfNeeded: Unit = {
+  protected def _writeArrayFieldNameIfNeeded(): Unit = {
     if (isArray) {
       val p = getAndIncCurrentArrayPos
       _writeFieldName(String.valueOf(p))
     }
   }
 
-  override def writeFieldName(name: Nothing): Unit = {
-    var status: Int = _writeContext.writeFieldName(name)
+  override def writeFieldName(name: String): Unit = {
+    val status = _writeContext.writeFieldName(name)
     if (status == JsonWriteContext.STATUS_EXPECT_VALUE) {
       _reportError("Can not write a field name, expecting a value")
     }
     _writeFieldName(name)
   }
 
-  private def _writeFieldName(name: Nothing): Unit = {
+  private def _writeFieldName(name: String): Unit = {
     _typeMarker = _buffer.size
     _buffer.putByte(0.asInstanceOf[Byte])
     _buffer.putUTF8(name)
@@ -262,14 +262,14 @@ class BsonGenerator(
    * method is a no-op if streaming is disabled.
    * @throws IOException if flushing failed
    */
-  protected def flushBuffer: Unit = {
+  protected def flushBuffer(): Unit = {
     if (isEnabled(Feature.ENABLE_STREAMING)) {
       _buffer.flushTo(_out)
     }
   }
 
-  override def writeString(text: Nothing): Unit = {
-    _writeArrayFieldNameIfNeeded
+  override def writeString(text: String): Unit = {
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_STRING)
     var p: Int = _buffer.size
@@ -281,11 +281,11 @@ class BsonGenerator(
   }
 
   override def writeString(text: Array[Char], offset: Int, len: Int): Unit = {
-    writeString(new Nothing(text, offset, len))
+    writeString(new String(text, offset, len))
   }
 
-  override def writeRaw(text: Nothing): Unit = {
-    _writeArrayFieldNameIfNeeded
+  override def writeRaw(text: String): Unit = {
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write raw string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BINARY)
     _buffer.putInt(text.length * 2)
@@ -294,12 +294,12 @@ class BsonGenerator(
     flushBuffer
   }
 
-  override def writeRaw(text: Nothing, offset: Int, len: Int): Unit = {
+  override def writeRaw(text: String, offset: Int, len: Int): Unit = {
     writeRaw(text.substring(offset, len))
   }
 
   override def writeRaw(text: Array[Char], offset: Int, len: Int): Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write raw string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BINARY)
     _buffer.putInt(text.length * 2)
@@ -327,8 +327,9 @@ class BsonGenerator(
    * @param len the number of bytes to write
    * @throws IOException if the binary data could not be written
    */
-  def writeBinary(b64variant: Base64Variant, subType: Byte, data: Array[Byte], offset: Int, len: Int): Unit = {
-    _writeArrayFieldNameIfNeeded
+  def writeBinary(b64variant: Base64Variant, subType: Byte, data: Array[Byte], o: Int, len: Int): Unit = {
+    var offset = o
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write binary")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BINARY)
     _buffer.putInt(len)
@@ -345,7 +346,7 @@ class BsonGenerator(
   }
 
   override def writeNumber(v: Int): Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write number")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_INT32)
     _buffer.putInt(v)
@@ -353,14 +354,14 @@ class BsonGenerator(
   }
 
   override def writeNumber(v: Long): Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write number")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_INT64)
     _buffer.putLong(v)
     flushBuffer
   }
 
-  override def writeNumber(v: Nothing): Unit = {
+  override def writeNumber(v: BigInteger): Unit = {
     val bl = v.bitLength
     if (bl < 32) {
       writeNumber(v.intValue)
@@ -374,7 +375,7 @@ class BsonGenerator(
   }
 
   override def writeNumber(d: Double): Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write number")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_DOUBLE)
     _buffer.putDouble(d)
@@ -406,7 +407,7 @@ class BsonGenerator(
   }
 
   override def writeBoolean(state: Boolean): Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write boolean")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_BOOLEAN)
     _buffer.putByte((if (state) 1 else 0).asInstanceOf[Byte])
@@ -414,7 +415,7 @@ class BsonGenerator(
   }
 
   override def writeNull: Unit = {
-    _writeArrayFieldNameIfNeeded
+    _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write null")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_NULL)
     flushBuffer
@@ -426,12 +427,11 @@ class BsonGenerator(
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_STRING)
     val p = _buffer.size
     _buffer.putInt(0)
-    {
-      var i = offset
-      while (i < length) {
-        _buffer.putByte(text(i))
-        i += 1
-      }
+
+    var i = offset
+    while (i < length) {
+      _buffer.putByte(text(i))
+      i += 1
     }
     _buffer.putByte(BsonConstants.END_OF_STRING)
     _buffer.putInt(p, length)

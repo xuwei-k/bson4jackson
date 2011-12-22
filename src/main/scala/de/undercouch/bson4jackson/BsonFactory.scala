@@ -82,7 +82,7 @@ class BsonFactory protected[bson4jackson](oc:ObjectCodec) extends JsonFactory(oc
    * @param f the feature to enable
    */
   def enable(f:BsonGenerator.Feature):BsonFactory = {
-    _bsonGeneratorFeatures |= f.getMask()
+    _bsonGeneratorFeatures |= f.getMask
     this
   }
 
@@ -93,7 +93,7 @@ class BsonFactory protected[bson4jackson](oc:ObjectCodec) extends JsonFactory(oc
    */
 
   def disable(f:BsonGenerator.Feature):BsonFactory = {
-    _bsonGeneratorFeatures &= ~f.getMask()
+    _bsonGeneratorFeatures &= ~f.getMask
     this
   }
 
@@ -101,7 +101,7 @@ class BsonFactory protected[bson4jackson](oc:ObjectCodec) extends JsonFactory(oc
    * @return true if the specified generator feature is enabled
    */
   final def isEnabled(f:BsonGenerator.Feature):Boolean = {
-    (_bsonGeneratorFeatures & f.getMask()) != 0
+    (_bsonGeneratorFeatures & f.getMask) != 0
   }
 
   /**
@@ -123,7 +123,7 @@ class BsonFactory protected[bson4jackson](oc:ObjectCodec) extends JsonFactory(oc
    * @param f the feature to enable
    */
   def enable(f:BsonParser.Feature):BsonFactory = {
-    _bsonParserFeatures |= f.getMask()
+    _bsonParserFeatures |= f.getMask
     this
   }
 
@@ -133,7 +133,7 @@ class BsonFactory protected[bson4jackson](oc:ObjectCodec) extends JsonFactory(oc
    * @param f the feature to disable
    */
   def disable(f:BsonParser.Feature):BsonFactory = {
-    _bsonParserFeatures &= ~f.getMask()
+    _bsonParserFeatures &= ~f.getMask
     this
   }
 
@@ -141,7 +141,7 @@ class BsonFactory protected[bson4jackson](oc:ObjectCodec) extends JsonFactory(oc
    * @return true if the specified parser feature is enabled
    */
   final def isEnabled(f:BsonParser.Feature):Boolean = {
-    (_bsonParserFeatures & f.getMask()) != 0
+    (_bsonParserFeatures & f.getMask) != 0
   }
 
   @throws(classOf[IOException])
