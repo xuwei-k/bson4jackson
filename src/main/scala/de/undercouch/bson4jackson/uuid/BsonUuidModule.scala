@@ -1,6 +1,6 @@
 // Copyright 2010-2011 Ed Anuff
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package de.undercouch.bson4jackson.uuid;
+package de.undercouch.bson4jackson.uuid
 
-import java.util.UUID;
+import java.util.UUID
 
-import org.codehaus.jackson.Version;
-import org.codehaus.jackson.map.module.SimpleModule;
+import org.codehaus.jackson.Version
+import org.codehaus.jackson.map.module.SimpleModule
 
 /**
  * Module which registers a serializer that writes UUIDs as BSON binary fields
@@ -26,5 +26,5 @@ import org.codehaus.jackson.map.module.SimpleModule;
  * @author Ed Anuff
  */
 class BsonUuidModule extends SimpleModule("BsonUuidModule", new Version(0, 1, 0, "alpha")) {
-  addSerializer(classOf[UUID], new BsonUuidSerializer());
+  addSerializer(classOf[UUID], new BsonUuidSerializer())
 }

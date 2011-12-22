@@ -1,6 +1,6 @@
 // Copyright 2010-2011 Ed Anuff
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package de.undercouch.bson4jackson.uuid;
+package de.undercouch.bson4jackson.uuid
 
-import java.io.IOException;
-import java.util.UUID;
+import java.io.IOException
+import java.util.UUID
 
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonSerializer;
-import org.codehaus.jackson.map.SerializerProvider;
+import org.codehaus.jackson.JsonGenerationException
+import org.codehaus.jackson.JsonGenerator
+import org.codehaus.jackson.JsonProcessingException
+import org.codehaus.jackson.map.JsonSerializer
+import org.codehaus.jackson.map.SerializerProvider
 
-import de.undercouch.bson4jackson.BsonConstants;
-import de.undercouch.bson4jackson.BsonGenerator;
+import de.undercouch.bson4jackson.BsonConstants
+import de.undercouch.bson4jackson.BsonGenerator
 
 /**
  * Serializer for writing UUIDs as BSON binary fields with UUID subtype. Can
@@ -38,10 +38,10 @@ class BsonUuidSerializer extends JsonSerializer[UUID]{
   override def serialize( value:UUID,jgen:JsonGenerator,provider:SerializerProvider){
     if (!(jgen.isInstanceOf[BsonGenerator])) {
       throw new JsonGenerationException("BsonUuidSerializer can " +
-          "only be used with BsonGenerator");
+          "only be used with BsonGenerator")
     }
     jgen.asInstanceOf[BsonGenerator].writeBinary(null, BsonConstants.SUBTYPE_UUID,
-        BsonUuidSerializer.uuidToLittleEndianBytes(value), 0, 16);
+        BsonUuidSerializer.uuidToLittleEndianBytes(value), 0, 16)
   }
 }
 

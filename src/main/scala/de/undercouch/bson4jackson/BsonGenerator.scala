@@ -272,9 +272,9 @@ class BsonGenerator(
     _writeArrayFieldNameIfNeeded()
     _verifyValueWrite("write string")
     _buffer.putByte(_typeMarker, BsonConstants.TYPE_STRING)
-    var p: Int = _buffer.size
+    val p = _buffer.size
     _buffer.putInt(0)
-    var l: Int = _buffer.putUTF8(text)
+    val l = _buffer.putUTF8(text)
     _buffer.putByte(BsonConstants.END_OF_STRING)
     _buffer.putInt(p, l + 1)
     flushBuffer
@@ -392,7 +392,7 @@ class BsonGenerator(
       writeNumber(f)
     }
     else {
-      var d = dec.doubleValue
+      val d = dec.doubleValue
       if (!java.lang.Double.isInfinite(d)) {
         writeNumber(d)
       }
@@ -455,5 +455,5 @@ class BsonGenerator(
   /**
    * Saves information about documents (the main document and embedded ones)
    */
-  protected var _documents = new ArrayDeque[DocumentInfo]()
+  protected val _documents = new ArrayDeque[DocumentInfo]()
 }

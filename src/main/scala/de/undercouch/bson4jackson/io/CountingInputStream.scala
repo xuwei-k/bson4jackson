@@ -1,6 +1,6 @@
 // Copyright 2010-2011 Michel Kraemer
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package de.undercouch.bson4jackson.io;
+package de.undercouch.bson4jackson.io
 
-import java.io.FilterInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.FilterInputStream
+import java.io.IOException
+import java.io.InputStream
 
 /**
  * Reads from another input stream, but counts the number of
@@ -42,30 +42,30 @@ class CountingInputStream(in:InputStream) extends FilterInputStream(in) {
     if (r > 0) {
       _pos += 1
     }
-    r;
+    r
   }
 
   @throws(classOf[IOException])
   override def read(b:Array[Byte]):Int = {
     val r = super.read(b)
     if (r > 0) {
-      _pos += r;
+      _pos += r
     }
-    r;
+    r
   }
 
   @throws(classOf[IOException])
   override def read(b:Array[Byte], off:Int,len:Int):Int = {
-    val r = super.read(b, off, len);
+    val r = super.read(b, off, len)
     if (r > 0) {
-      _pos += r;
+      _pos += r
     }
-    r;
+    r
   }
 
   @throws(classOf[IOException])
   override def skip(n:Long):Long = {
-    val r = super.skip(n);
+    val r = super.skip(n)
     if (r > 0) {
       _pos += r.asInstanceOf[Int]
     }

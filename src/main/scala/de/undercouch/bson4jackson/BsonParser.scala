@@ -263,7 +263,7 @@ class BsonParser(
             ctx.value = readObjectId
             _currToken = JsonToken.VALUE_EMBEDDED_OBJECT
           case BsonConstants.TYPE_BOOLEAN =>
-            var b = _in.readBoolean
+            val b = _in.readBoolean
             ctx.value = b.asInstanceOf[JBoolean]
             _currToken = (if (b) JsonToken.VALUE_TRUE else JsonToken.VALUE_FALSE)
           case BsonConstants.TYPE_DATETIME =>
@@ -316,7 +316,7 @@ class BsonParser(
    */
   protected def handleNewDocument(array: Boolean): JsonToken = {
     if (_in == null) {
-      var buf = new Array[Byte](JInteger.SIZE / JByte.SIZE)
+      val buf = new Array[Byte](JInteger.SIZE / JByte.SIZE)
       var len = 0
       while (len < buf.length) {
         var l = _rawInputStream.read(buf, len, buf.length - len)
@@ -325,7 +325,7 @@ class BsonParser(
         }
         len += l
       }
-      var documentLength = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).getInt
+      val documentLength = ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).getInt
       var in: InputStream = new BoundedInputStream(_rawInputStream, documentLength - buf.length)
       if (!(_rawInputStream.isInstanceOf[BufferedInputStream])) {
         in = new StaticBufferedInputStream(in)
@@ -351,8 +351,8 @@ class BsonParser(
     val ctx = getContext
     subtype match {
       case BsonConstants.SUBTYPE_BINARY_OLD =>
-        val size2: Int = _in.readInt
-        val buf2: Array[Byte] = new Array[Byte](size2)
+        val size2 = _in.readInt
+        val buf2  = new Array[Byte](size2)
         _in.readFully(buf2)
         ctx.value = buf2
       case BsonConstants.SUBTYPE_UUID =>
@@ -360,7 +360,7 @@ class BsonParser(
         val l2 = _in.readLong
         ctx.value = new UUID(l1, l2)
       case _ =>
-        var buf: Array[Byte] = new Array[Byte](size)
+        val buf = new Array[Byte](size)
         _in.readFully(buf)
         ctx.value = buf
     }
@@ -475,9 +475,7 @@ class BsonParser(
    * @return the symbol
    * @throws IOException if the symbol could not be read
    */
-  protected def readSymbol: Symbol = {
-    return new Symbol(readString)
-  }
+  protected def readSymbol: Symbol = new Symbol(readString)
 
   /**
    * Reads a timestamp object from the input stream
@@ -485,9 +483,9 @@ class BsonParser(
    * @throws IOException if the timestamp could not be read
    */
   protected def readTimestamp: Timestamp = {
-    var inc: Int = _in.readInt
-    var time: Int = _in.readInt
-    return new Timestamp(time, inc)
+    val inc  = _in.readInt
+    val time = _in.readInt
+    new Timestamp(time, inc)
   }
 
   /**
@@ -496,10 +494,10 @@ class BsonParser(
    * @throws IOException if the ObjectID could not be read
    */
   protected def readObjectId: ObjectId = {
-    var time: Int = ByteOrderUtil.flip(_in.readInt)
-    var machine: Int = ByteOrderUtil.flip(_in.readInt)
-    var inc: Int = ByteOrderUtil.flip(_in.readInt)
-    return new ObjectId(time, machine, inc)
+    val Seq(time,machine,inc) = (1 to 3).map{i =>
+      ByteOrderUtil.flip(_in.readInt)
+    }
+    new ObjectId(time, machine, inc)
   }
 
   /**
@@ -508,7 +506,7 @@ class BsonParser(
    * @throws IOException if the document could not be read
    */
   protected def readDocument: JMap[String,Any] = {
-    var codec = getCodec
+    val codec = getCodec
     if (codec == null) {
       throw new IllegalStateException("Could not parse embedded document because BSON parser has no codec")
     }

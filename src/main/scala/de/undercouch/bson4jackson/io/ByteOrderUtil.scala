@@ -1,6 +1,6 @@
 // Copyright 2010-2011 Michel Kraemer
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package de.undercouch.bson4jackson.io;
+package de.undercouch.bson4jackson.io
 
 /**
  * Provides static methods to change the byte order of single values
@@ -25,11 +25,11 @@ object ByteOrderUtil {
    * @return the flipped integer
    */
   def flip(i:Int):Int = {
-    var result = 0;
-    result |= (i & 0xFF) << 24;
-    result |= (i & 0xFF00) << 8;
-    result |= ((i & 0xFF0000) >> 8) & 0xFF00;
-    result |= ((i & 0xFF000000) >> 24) & 0xFF;
-    return result;
+    var result = 0
+    result |= (i & 0xFF) << 24
+    result |= (i & 0xFF00) << 8
+    result |= ((i & 0xFF0000) >> 8) & 0xFF00
+    result |= ((i & 0xFF000000) >> 24) & 0xFF
+    result
   }
 }

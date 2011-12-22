@@ -1,6 +1,6 @@
 // Copyright 2010-2011 Michel Kraemer
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package de.undercouch.bson4jackson.io;
+package de.undercouch.bson4jackson.io
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
+import java.io.BufferedInputStream
+import java.io.IOException
+import java.io.InputStream
+import java.nio.ByteBuffer
 
 object StaticBufferedInputStream{
   /**
    * A unique key for the re-usable buffer
    */
-  private val BUFFER_KEY = StaticBuffers.Key.BUFFER1;
+  private val BUFFER_KEY = StaticBuffers.Key.BUFFER1
 }
 
 /**
@@ -45,10 +45,10 @@ class StaticBufferedInputStream(
   /**
    * A re-usable buffer
    */
-  private val _byteBuffer = _staticBuffers.byteBuffer(BUFFER_KEY, size);
+  private val _byteBuffer = _staticBuffers.byteBuffer(BUFFER_KEY, size)
 
   //replace buffer allocated by super constructor
-  buf = _byteBuffer.array();
+  buf = _byteBuffer.array()
 
   /**
    * @see BufferedInputStream#BufferedInputStream(InputStream)
@@ -59,7 +59,7 @@ class StaticBufferedInputStream(
 
   @throws(classOf[IOException])
   override def close(){
-    _staticBuffers.releaseByteBuffer(BUFFER_KEY, _byteBuffer);
-    super.close();
+    _staticBuffers.releaseByteBuffer(BUFFER_KEY, _byteBuffer)
+    super.close()
   }
 }

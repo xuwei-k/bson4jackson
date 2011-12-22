@@ -1,6 +1,6 @@
 // Copyright 2010-2011 Michel Kraemer
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Apache License, Version 2.0 (the "License")
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
@@ -54,13 +54,13 @@ import java.lang.{
  * writing the rest:
  * <pre>
  * ...
- * buf.flushTo(out);
+ * buf.flushTo(out)
  * ...
- * buf.flushTo(out);
+ * buf.flushTo(out)
  * ...
- * buf.flushTo(out);
+ * buf.flushTo(out)
  * ...
- * buf.writeTo(out);</pre>
+ * buf.writeTo(out)</pre>
  * </p>
  * <p>If flushing is never used a single call to one of the <code>writeTo</code>
  * methods is enough to write the whole buffer.</p>
@@ -183,7 +183,7 @@ class DynamicOutputBuffer(private var _order:ByteOrder,private val _bufferSize:I
   private def addNewBuffer():ByteBuffer = {
     val bb = allocateBuffer
     _buffers.add(bb)
-    return bb
+    bb
   }
 
   /**
@@ -297,8 +297,8 @@ class DynamicOutputBuffer(private var _order:ByteOrder,private val _bufferSize:I
         i = pos % _bufferSize
       }
       bb.put(i, b)
-      i += 1;
-      pos += 1;
+      i += 1
+      pos += 1
     }
   }
 
@@ -582,11 +582,11 @@ class DynamicOutputBuffer(private var _order:ByteOrder,private val _bufferSize:I
    */
   def writeTo(out: WritableByteChannel): Unit = {
     var n1 = _flushPosition / _bufferSize
-    var n2 = _buffers.size
+    val n2 = _buffers.size
     var toWrite = _size - _flushPosition
     while (n1 < n2) {
-      var curWrite = math.min(toWrite, _bufferSize)
-      var bb = _buffers.get(n1)
+      val curWrite = math.min(toWrite, _bufferSize)
+      val bb = _buffers.get(n1)
       bb.position(curWrite)
       bb.flip
       out.write(bb)
