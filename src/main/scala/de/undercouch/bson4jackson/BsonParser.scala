@@ -13,38 +13,24 @@
 // limitations under the License.
 package de.undercouch.bson4jackson
 
-import java.io.BufferedInputStream
-import java.io.IOException
-import java.io.InputStream
-import java.math.BigDecimal
-import java.math.BigInteger
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.util.ArrayDeque
-import java.util.Date
-import java.util.Deque
-import java.util.LinkedHashMap
-import java.util.{Map => JMap}
-import java.util.UUID
+import java.io.{BufferedInputStream,IOException,InputStream}
+import java.math.{BigDecimal,BigInteger}
+import java.nio.{ByteBuffer,ByteOrder}
+import java.util.{
+  ArrayDeque,Date,Deque,LinkedHashMap,UUID,Map => JMap
+}
 import java.util.regex.Pattern
-import org.codehaus.jackson.Base64Variant
-import org.codehaus.jackson.JsonLocation
-import org.codehaus.jackson.JsonParseException
-import org.codehaus.jackson.JsonParser
-import org.codehaus.jackson.JsonStreamContext
-import org.codehaus.jackson.JsonToken
-import org.codehaus.jackson.ObjectCodec
 import org.codehaus.jackson.impl.JsonParserMinimalBase
 import org.codehaus.jackson.`type`.TypeReference
-import de.undercouch.bson4jackson.io.BoundedInputStream
-import de.undercouch.bson4jackson.io.ByteOrderUtil
-import de.undercouch.bson4jackson.io.CountingInputStream
-import de.undercouch.bson4jackson.io.LittleEndianInputStream
-import de.undercouch.bson4jackson.io.StaticBufferedInputStream
-import de.undercouch.bson4jackson.types.JavaScript
-import de.undercouch.bson4jackson.types.ObjectId
-import de.undercouch.bson4jackson.types.Symbol
-import de.undercouch.bson4jackson.types.Timestamp
+import org.codehaus.jackson.{
+  Base64Variant,JsonLocation,JsonParseException,JsonParser,JsonStreamContext,JsonToken,ObjectCodec
+}
+import de.undercouch.bson4jackson.io.{
+  BoundedInputStream,ByteOrderUtil,CountingInputStream,LittleEndianInputStream,StaticBufferedInputStream
+}
+import de.undercouch.bson4jackson.types.{
+  JavaScript,ObjectId,Symbol,Timestamp
+}
 import java.lang.{
   Integer => JInteger,Byte => JByte,Long => JLong,Short => JShort,Double => JDouble,Float => JFloat,Boolean => JBoolean
 }
